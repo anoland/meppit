@@ -1,14 +1,19 @@
 package meppit
 
 import (
-    "fmt"
+    "html/template"
     "net/http"
 )
 
+type Page struct {
+	Title string
+}
 func init() {
     http.HandleFunc("/", handler)
 }
 
 func handler(w http.ResponseWriter, r *http.Request) {
-    fmt.Fprint(w, "Hello again, image05!")
+	p := Page{"title"}
+	t := template.Must(template.ParseGlob("meppit/templates/*"))
+	t.ExecuteTemplate(w, "layout", p)
 }
