@@ -15,6 +15,7 @@ import (
 )
 const (
     url = "http://reddit.com/r/kansascity/comments/1w5mel/brunch/.xml"
+    url2 = "http://www.reddit.com/r/kansascity/comments/1ynfb1/who_makes_the_best_reuben_in_town/.xml"
 )
 
 
@@ -40,7 +41,7 @@ func init() {
 func fetchHandler(w http.ResponseWriter, r *http.Request) {
     ctx := appengine.NewContext(r)
 	client := urlfetch.Client(ctx)
-    res, err := client.Get(url)
+    res, err := client.Get(url2)
 
     if err != nil {
         fmt.Println(err)
@@ -55,7 +56,7 @@ func fetchHandler(w http.ResponseWriter, r *http.Request) {
     }
 
     for _, item := range rss.Items.ItemList {
-        fmt.Fprintf(w, "%s: %s<br />", item.Title, item.Description)
+        fmt.Fprintf(w, "%s \r\n", item.Description)
     }
     
 }
