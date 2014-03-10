@@ -12,8 +12,11 @@ func init() {
     http.HandleFunc("/", handler)
 }
 
+var templates = template.Must(template.ParseGlob("templates/*.tpl"))
+
+
 func handler(w http.ResponseWriter, r *http.Request) {
-	p := Page{"title"}
-	t := template.Must(template.ParseGlob("meppit/templates/*"))
-	t.ExecuteTemplate(w, "layout", p)
+	p := new(Page)
+	p.Title = "title" 
+	templates.ExecuteTemplate(w, "layout", p)
 }
