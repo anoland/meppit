@@ -54,12 +54,11 @@ func fetchHandler(w http.ResponseWriter, r *http.Request) {
     if err != nil {
         log.Fatal(err)  
     }
-
-    for _, item := range rss.Items.ItemList {
-        fmt.Fprintf(w, "%s \r\n", item.Description)
+	items := make(map[int]Item)
+    for i, item := range rss.Items.ItemList {
+	[i]items := item
+	fmt.Fprintf(w, "%s \r\n", item.Description)
     }
-	p := new(Page)
-	p.Title = "fetch" 
-	templates.ExecuteTemplate(w, "fetch", p)
-    
+
+	//templates.ExecuteTemplate(w, "fetch", items)   
 }

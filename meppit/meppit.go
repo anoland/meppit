@@ -5,18 +5,14 @@ import (
     "net/http"
 )
 
-type Page struct {
-	Title string
-}
+type Title string
+
 func init() {
     http.HandleFunc("/", handler)
 }
 
-var templates = template.Must(template.ParseGlob("templates/*.tpl"))
-
+var templates = template.Must(template.ParseGlob("meppit/templates/*.tpl"))
 
 func handler(w http.ResponseWriter, r *http.Request) {
-	p := new(Page)
-	p.Title = "title" 
-	templates.ExecuteTemplate(w, "index", p)
+	templates.ExecuteTemplate(w, "index", nil)   
 }
