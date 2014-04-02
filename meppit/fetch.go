@@ -41,7 +41,7 @@ func init() {
 func fetchHandler(w http.ResponseWriter, r *http.Request) {
     ctx := appengine.NewContext(r)
 	client := urlfetch.Client(ctx)
-    res, err := client.Get(url2)
+    res, err := client.Get(url)
 
     if err != nil {
         fmt.Println(err)
@@ -59,6 +59,8 @@ func fetchHandler(w http.ResponseWriter, r *http.Request) {
 	[i]items := item
 	fmt.Fprintf(w, "%s \r\n", item.Description)
     }
-
-	//templates.ExecuteTemplate(w, "fetch", items)   
+    
+	p := new(Page)
+	p.Title = "title" 
+	templates.ExecuteTemplate(w, "fetch", p)
 }

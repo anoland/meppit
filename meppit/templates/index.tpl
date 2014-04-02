@@ -9,7 +9,7 @@
       </div>
     </div>
 
-    <div class="container">
+    <div class="container" id="pjax-container">
       <!-- Example row of columns -->
       <div class="row">
         <div class="col-lg-4">

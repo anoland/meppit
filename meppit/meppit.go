@@ -14,5 +14,7 @@ func init() {
 var templates = template.Must(template.ParseGlob("meppit/templates/*.tpl"))
 
 func handler(w http.ResponseWriter, r *http.Request) {
-	templates.ExecuteTemplate(w, "index", nil)   
+	index := new(Page)
+	index.SetTitle("title") 
+	templates.ExecuteTemplate(w, "index", index)
 }
