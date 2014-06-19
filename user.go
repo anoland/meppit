@@ -3,8 +3,8 @@ package main
 import (
   "net/http"
     
-  "anoland.rhcloud.com/golangtest001/domain"
-  "anoland.rhcloud.com/golangtest001/templates"
+  "anoland.rhcloud.com/meppit/domain"
+  "anoland.rhcloud.com/meppit/templates"
 )
 
 func init() {
