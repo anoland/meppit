@@ -1,0 +1,2 @@
+#!/bin/bash
+curl -d "m=checking in from openshift" https://nosnch.in/6e2ae83198 
