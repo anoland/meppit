@@ -1,3 +1,0 @@
-export HOST=0.0.0.0
-export PORT=3000
-export OPENSHIFT_MONGODB_DB_URL=mongodb://127.0.0.1/
