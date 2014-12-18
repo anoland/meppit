@@ -9,8 +9,6 @@ import (
     "net/http"    
 
 
-    "appengine"
-    "appengine/urlfetch"
 
 )
 const (
@@ -39,10 +37,7 @@ func init() {
 }
 
 func fetchHandler(w http.ResponseWriter, r *http.Request) {
-    ctx := appengine.NewContext(r)
-	client := urlfetch.Client(ctx)
-    res, err := client.Get(url)
-
+// re-insert http client to grab url
     if err != nil {
         fmt.Println(err)
     }
