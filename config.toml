@@ -1,5 +1,0 @@
-version = 0.1
-
-[host]
-listenaddr = "50.116.22.42"
-listenport = "8080"
