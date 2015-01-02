@@ -7,6 +7,7 @@ import (
 
     "github.com/burntsushi/toml"
 
+    _ "github.com/anoland/meppit/web"
 )
 	
 var config Config
@@ -19,7 +20,7 @@ type host struct {
     ListenAddr string `toml:"listenaddr"`
     ListenPort string `toml:"listenport"`
 
-    }
+}
 
 func main() {
     if _, err := toml.DecodeFile("config.toml", &config); err != nil {
@@ -33,7 +34,7 @@ func main() {
         return
     } 
 
-    log.Println("Started server on ", listen)
-    log.Println("Running version:", config.Version)
+    fmt.Println("Started server on ", listen)
+    fmt.Println("Running version:", config.Version)
     
 }

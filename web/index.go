@@ -7,9 +7,9 @@ import (
 
 
 func init() {
-    http.HandleFunc("/submit", submitHandler)
+    http.HandleFunc("/", indexHandler)
 }
 
-func submitHandler(w http.ResponseWriter, r *http.Request) {
-    w.Write([]byte("hello")
+func indexHandler(w http.ResponseWriter, r *http.Request) {
+    w.Write([]byte("hello"))
 }
