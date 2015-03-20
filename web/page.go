@@ -1,4 +1,4 @@
-package meppit
+package web
 
 
 type Page struct {

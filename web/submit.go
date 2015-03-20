@@ -1,10 +1,9 @@
-package meppit
+package web
 
 import (
 
     "net/http"    
 
-  //  "appengine"
 
 )
 
@@ -16,6 +15,4 @@ func submitHandler(w http.ResponseWriter, r *http.Request) {
     submit := NewPage()
     submit.SetTitle("Submit") 
     submit.SetContent("this is content")
-    templates.ExecuteTemplate(w, "submit", submit)
-//    ctx := appengine.NewContext(r)
 }

@@ -1,4 +1,4 @@
-package meppit
+package web
 
 import (
 
@@ -7,11 +7,6 @@ import (
     "io/ioutil"
     "log"
     "net/http"    
-
-
-    "appengine"
-    "appengine/urlfetch"
-
 )
 const (
     url = "http://reddit.com/r/kansascity/comments/1w5mel/brunch/.xml"
@@ -39,10 +34,7 @@ func init() {
 }
 
 func fetchHandler(w http.ResponseWriter, r *http.Request) {
-    ctx := appengine.NewContext(r)
-	client := urlfetch.Client(ctx)
-    res, err := client.Get(url)
-
+    res, err := http.Get(url)
     if err != nil {
         fmt.Println(err)
     }
@@ -54,13 +46,8 @@ func fetchHandler(w http.ResponseWriter, r *http.Request) {
     if err != nil {
         log.Fatal(err)  
     }
-	items := make(map[int]Item)
-    for i, item := range rss.Items.ItemList {
-	[i]items := item
-	fmt.Fprintf(w, "%s \r\n", item.Description)
+    for _, item := range rss.Items.ItemList {
+        fmt.Fprintf(w, "%s \r\n<br />", item.Description)
     }
     
-	p := new(Page)
-	p.Title = "title" 
-	templates.ExecuteTemplate(w, "fetch", p)
 }

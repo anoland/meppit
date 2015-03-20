@@ -14,7 +14,7 @@ simple really...
     * some entity extraction service will pull out the names of places and save them (apialchemy)
     * some entity will run searches to get address of places
     * some entity will geocode addresses to lat/lon (mapquest)
-    * some entity will build GeoJSON and/or kml layers for rendering on map (mapquest again?)
+    * some entity will build GeoJSON and/or kml layers for rendering on map (mapquest-osm again?)
 * rendering server
   * select all places for a particular thread and send the output to the client
 
