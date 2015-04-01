@@ -45,9 +45,7 @@ type database struct {
     Dbpass string `toml:"dbpass"`
     Dbname string `toml:"dbname"`
 }
-func init() {
-// empty for now... may move setup to here later
-}
+
 func main() {
     config := Config{}
 	if _, err := toml.DecodeFile("config.toml", &config); err != nil {
