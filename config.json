@@ -1,0 +1,13 @@
+{
+    "version":0.1,
+    "host":{
+        "listenaddr":"50.116.22.42",
+        "listenport":"8080"
+    },
+    "database":{
+        "dbhost":"wwwdbhost",
+        "dbuser":"meppit",
+        "dbpass":"c7e61d4eee",
+        "dbname":"meppit"
+    }
+}

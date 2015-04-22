@@ -17,21 +17,21 @@ body {
     margin-top: 5px;
 }
  
-#nav {
+#logo, #nav, #usernav{
     margin: 13px 0 0 0;
 }
  
-#nav ul li {
+#logo ul li, #nav ul li, #usernav ul li {
     display: inline;
     margin: 0 20px 0 0;
     margin-bottom: 30px;
 }
  
-#nav a {
+#logo a, #nav a, #usernav a {
     text-decoration: none;
 }
  
-#nav a:hover {
+#nav a:hover, #usernav a:hover {
     text-decoration: underline;
 }
 

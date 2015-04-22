@@ -24,34 +24,29 @@
 <body>
   <div class="container ">
      
-    <div id="nav" class="row">
-        <span class="five columns">
+    <div id="header" class="row u-full-width">
+        <span id="logo" class="two columns">[logo here]</span>
+        <span id="nav" class="five columns">
             <ul>
                 <li><a href="/">Home</a></li>
                 <li><a href="/#">About</a></li>
                 <li><a href="/#">Contact</a></li>
             </ul>
         </span>
-        <span class="one columns u-pull-right">
+        <span id="usernav" class="two columns u-pull-right">
             <ul>
               <li><a href="/login">Login</a></li>
             </ul>
         </span>
     </div>
     
-    <div class="row u-full-width">
-        <div><span style="text-align:center"> header section</span></div>
+    <div id="mast" class="row u-full-width">
+        <span class="twelve columns" > header section</span>
     </div>
-    <div class="row">
-      <div class="one-third column" >
-        <h4>Rolling div</h4>
-        <p>{{template "content" . }}</p>
-      </div>
-      <div class="two-thirds column" >
-        <h4>map div</h4>
-
-        <p>{{template "content" . }}</p>
-      </div>
+    <div id="body" class="row u-full-width">
+        <span class="twelve columns">
+            {{ yield }}
+        </span>
     </div>
   </div>
 </body>

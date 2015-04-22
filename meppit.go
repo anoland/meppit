@@ -1,200 +1,230 @@
 package main
 
 import (
-	"bytes"
-    "database/sql"
-//	"encoding/json"
-    "errors"
+	"database/sql"
+	"encoding/json"
 	"fmt"
-	"html/template"
-//	"io/ioutil"
+	_ "github.com/go-sql-driver/mysql"
+	"io/ioutil"
 	"log"
 	"net/http"
-    "os"
-    "path/filepath"
-    "strings"
-    "syscall"
+	"os"
+	"sort"
 	"time"
-	_ "github.com/go-sql-driver/mysql"
 
-	"github.com/burntsushi/toml"
-    "github.com/mikespook/golib/signal"
+	"github.com/codegangsta/negroni"
+	"github.com/jzelinskie/geddit"
+	"gopkg.in/unrolled/render.v1"
 )
 
 const (
-	url  = "http://reddit.com/r/kansascity/comments/1w5mel/brunch/.json"
+	url  = "http://www.reddit.com/r/kansascity/comments/1w5mel/brunch/.json"
 	url2 = "http://www.reddit.com/r/kansascity/comments/1ynfb1/who_makes_the_best_reuben_in_town/.json"
 )
 
-//var db =
+var conn *sql.DB
 var config Config
+var r *render.Render
 var logger = log.New(os.Stdout, "", log.Lshortfile)
-type Config struct {
-	Version float64 `toml:"version"`
-	Host    host    `toml:"host"`
-    Database database `toml:"database"`
 
+type Config struct {
+	Version  float64  `json:"version"`
+	Host     host     `json:"host"`
+	Database database `json:"database"`
 }
 type host struct {
-	ListenAddr string `toml:"listenaddr"`
-	ListenPort string `toml:"listenport"`
+	ListenAddr string `json:"listenaddr"`
+	ListenPort string `json:"listenport"`
 }
 type database struct {
-    Dbhost string `toml:"dbhost"`
-    Dbuser string `toml:"dbuser"`
-    Dbpass string `toml:"dbpass"`
-    Dbname string `toml:"dbname"`
+	Dbhost string `json:"dbhost"`
+	Dbuser string `json:"dbuser"`
+	Dbpass string `json:"dbpass"`
+	Dbname string `json:"dbname"`
 }
 
 func main() {
-    config := Config{}
-	if _, err := toml.DecodeFile("config.toml", &config); err != nil {
+	cf, err := ioutil.ReadFile("config.json")
+	if err != nil {
+		panic(err)
+	}
+	config := Config{}
+	if err := json.Unmarshal(cf, &config); err != nil {
 		logger.Fatal("Problem with config file", err)
 	}
 
 	logger.Println("Running version:", config.Version)
 
-    database := config.Database
-	dsn := fmt.Sprintf("%s:%s@tcp(%s:3306)/%s", database.Dbuser, database.Dbpass, database.Dbhost, database.Dbname)
-	db, _ = sql.Open("mysql", dsn)
-	if err := db.Ping(); err != nil {
+	dbconfig := config.Database
+	dsn := fmt.Sprintf("%s:%s@tcp(%s:3306)/%s", dbconfig.Dbuser, dbconfig.Dbpass, dbconfig.Dbhost, dbconfig.Dbname)
+	conn, _ = sql.Open("mysql", dsn)
+	if err := conn.Ping(); err != nil {
 		logger.Fatal(err)
 	}
-	defer db.Close()
-    if err := setup(); err != nil {
-        logger.Fatal(err)
-    }
+	var debug bool
+	app_env := os.Getenv("APP_ENVIRONMENT")
+	logger.Println("Running in environment: ", app_env)
+	if app_env == "development" {
+		debug = true
+		logger.Println("debugging is on")
+	} else {
+		debug = false
+		logger.Println("debugging is off")
+	}
+	r = render.New(render.Options{
+		Directory:     "templates",
+		Layout:        "layout",
+		IsDevelopment: debug,
+	})
 
+	go func() {
+		fetchJob()
+		ticker := time.Tick(1 * time.Hour)
+		for range ticker {
+			fetchJob()
+		}
+	}()
 
-	http.HandleFunc("/", indexHandler)
-    http.HandleFunc("/css/", staticHandler)
-    http.HandleFunc("/js/", staticHandler)
-    http.HandleFunc("/fetch", fetchHandler)
+	mux := http.NewServeMux()
+	mux.HandleFunc("/", indexHandler)
+	mux.HandleFunc("/admin/fetch/", fetchHandler)
+
 	listen := fmt.Sprintf("%s:%s", config.Host.ListenAddr, config.Host.ListenPort)
 	logger.Println("Starting server on: ", listen)
+	n := negroni.Classic()
+	n.UseHandler(mux)
+	n.Run(listen)
 	if err := http.ListenAndServe(listen, nil); err != nil {
 		logger.Fatal("Problem starting server", err)
 		return
 	}
 
-	signal.Bind(syscall.SIGINT, func() uint { return signal.BreakExit})
-    s := signal.Wait()
-	logger.Printf("Exit by signal: %s\n", s)
-
+}
+func indexHandler(w http.ResponseWriter, req *http.Request) {
+	p := struct {
+		Title string
+		Body  string
+	}{
+		"Index page",
+		"This is the body",
+	}
+	r.HTML(w, http.StatusOK, "index", p)
 }
 
-func staticHandler(w http.ResponseWriter, r *http.Request) {
-   http.ServeFile(w, r, filepath.Join("static", r.URL.Path)) 
+func fetchHandler(w http.ResponseWriter, req *http.Request) {
+	var (
+		title     string
+		reddit_id string
+		url       string
+	)
+	type Submission struct {
+		Title    string
+		RedditID string
+		URL      string
+	}
 
-}
-func indexHandler(w http.ResponseWriter, r *http.Request) {
-    
-    
-    p := struct{
-        Title string
-        Content string
-    }{
-        "index page",
-        "index page contnet",
-    }
-    RenderTemplate(w, "index", p)
-}
-func fetchHandler(w http.ResponseWriter, r *http.Request) {
-    p := struct {
-        Title string
-        Content string
-
-    }{
-       "fetch page",
-       "fetch page",
-    }
-    RenderTemplate(w, "fetch", p)
-}
-
-func setup () error{
-    if err := setupDB(); err != nil {
-        return err
-    }
-    if err := setupTemplates(); err != nil {
-        return err
-    }
-    return nil
-
-}
-var db *sql.DB
-func setupDB () error{
-    logger.Println("running setup")
-    logger.Println("setting up places table")
-    places_sql := `
-    CREATE TABLE IF NOT EXISTS places(
-        id INT PRIMARY KEY AUTO_INCREMENT,
-        name VARCHAR(20) NOT NULL,
-        description VARCHAR(255),
-        lat FLOAT,
-        lon FLOAT
-        );`
-    if _, err := db.Exec(places_sql); err != nil {
-        return err
-    }
-    logger.Println("setting up users table")
-    users_sql := `
-    CREATE TABLE IF NOT EXISTS users(
-        id INT PRIMARY KEY AUTO_INCREMENT,
-        username VARCHAR(20),
-        token VARCHAR(200)
-    );`
-    if _, err := db.Exec(users_sql); err != nil {
-        return err
-    }
-    logger.Println("setup complete")
-    return nil
-}
-var templates map[string]*template.Template
-func setupTemplates() error{
-    if templates == nil {
-        templates = make(map[string]*template.Template)
-    }
-
-
-    pages, err := filepath.Glob("templates/*.tpl") 
-    if err != nil {
-       return err
-    }
-
-    for _, page := range pages {
-        name := strings.TrimSuffix(filepath.Base(page), filepath.Ext(page))
-        templates[name] = template.Must(template.ParseFiles("layout.tpl", page))
-    }
-    return nil
-}
-func RenderTemplate(w http.ResponseWriter, name string, p interface{}) error {
-
-    if p == nil {
-        err := errors.New("could not find page")
-         http.Error(w, err.Error(), http.StatusInternalServerError)
-        return err
-    }
-    
-    tmpl, ok := templates[name]
-    if !ok {
-        logger.Println(fmt.Errorf("The template %s does not exist.", name))
-    }
-
-    var buff bytes.Buffer
-    if err := tmpl.ExecuteTemplate(&buff, "layout", p); err != nil {
-        logger.Println("Error executing template: ", name, err)
-    }
-	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-    buff.WriteTo(w)
-
-    return nil
-}
-func SaneTime(time time.Time) string {
-	format := "01/02/2006 15:04"
-	return time.Format(format)
+	var submissions []*Submission
+	rs, err := conn.Query("select title, reddit_id, url from submissions")
+	if err != nil {
+		logger.Println("fetching rows failed")
+	}
+	defer rs.Close()
+	for rs.Next() {
+		err := rs.Scan(&title, &reddit_id, &url)
+		if err != nil {
+			logger.Println(err)
+		}
+		s := Submission{
+			title,
+			reddit_id,
+			url,
+		}
+		submissions = append(submissions, &s)
+	}
+	err = rs.Err()
+	if err != nil {
+		logger.Println(err)
+	}
+	p := struct {
+		Title       string
+		Submissions []*Submission
+	}{
+		"fetch page",
+		submissions,
+	}
+	r.HTML(w, http.StatusOK, "admin/fetch", p)
 }
 
-var funcmap = template.FuncMap{
-	"SaneTime": SaneTime,
+func fetchJob() {
+	logger.Println("starting fetch job")
+
+	fetch_sql, err := conn.Prepare("insert into submissions (url, reddit_id, title) values ( ?, ?, ?)")
+	if err != nil {
+		logger.Println(err)
+	}
+
+	rs, err := conn.Query("select reddit_id from submissions")
+	if err != nil {
+		logger.Println(err)
+	}
+	defer rs.Close()
+	var haves []string
+	for rs.Next() {
+		var have string
+		err := rs.Scan(&have)
+		if err != nil {
+			logger.Println(err)
+		}
+		haves = append(haves, have)
+	}
+	err = rs.Err()
+	if err != nil {
+		logger.Fatal(err)
+	}
+	subreddit := "golang"
+	// todo: add toggle meppitdev
+	ua := fmt.Sprintf("web:Meppit: /r/meppit -  maps for reddit -:v %s (by /u/anoland)", config.Version)
+	ggg := geddit.NewSession(ua)
+	submissions, _ := ggg.SubredditSubmissions(subreddit)
+	count := 0
+	for _, sub := range submissions {
+		_, ok := idExists(haves, sub.ID)
+		if !ok {
+			_, err := fetch_sql.Exec(sub.URL, sub.ID, sub.Title)
+			count = count + 1
+			if err != nil {
+				logger.Println(err)
+			}
+		}
+
+	}
+	// todo: keep track of last sucessful fetch
+
+	logger.Println("finished fetch job.")
+	logger.Printf("processed %d submissions", count)
 }
 
+func idExists2(haystack []string, needle string) (int, bool) {
+	sort.Strings(haystack)
+	l := len(haystack)
+	for i := 0; i < l; i++ {
+		value := haystack[i]
+		if value < needle {
+			continue
+		}
+		return i, value == needle
+	}
+	return l, false
+}
+
+// reconfiguration of above using binary (builtin) search instead
+func idExists(haystack []string, needle string) (int, bool) {
+	sort.Strings(haystack)
+	l := len(haystack)
+	i := sort.SearchStrings(haystack, needle)
+	if i < l && haystack[i] == needle {
+		return i, true
+	}
+	return l, false
+
+}
