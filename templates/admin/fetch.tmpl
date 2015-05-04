@@ -1,7 +1,8 @@
 {{define "admin/fetch" }}
 <br />
     {{range .Submissions }}
-     ({{.RedditID}}) <a href="{{.URL}}">{{.Title}}</a>
+    <div>(<a href="/admin/fetch/detail/{{.RedditID}}">{{.RedditID}}</a>)
+        <a href="{{.URL}}">{{.Title}}</a>
      <br />
 
     {{end}}

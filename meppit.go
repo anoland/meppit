@@ -1,7 +1,7 @@
 package main
 
 import (
-	"database/sql"
+	//_ "database/sql"
 	"encoding/json"
 	"fmt"
 	_ "github.com/go-sql-driver/mysql"
@@ -11,9 +11,11 @@ import (
 	"os"
 	"sort"
 	"time"
-
+    
+	"github.com/anoland/geddit"
 	"github.com/codegangsta/negroni"
-	"github.com/jzelinskie/geddit"
+   "github.com/julienschmidt/httprouter" 
+    "github.com/jmoiron/sqlx"
 	"gopkg.in/unrolled/render.v1"
 )
 
@@ -22,13 +24,16 @@ const (
 	url2 = "http://www.reddit.com/r/kansascity/comments/1ynfb1/who_makes_the_best_reuben_in_town/.json"
 )
 
-var conn *sql.DB
-var config Config
+var conn *sqlx.DB
+var config *Config
 var r *render.Render
 var logger = log.New(os.Stdout, "", log.Lshortfile)
+var debug bool 
 
 type Config struct {
 	Version  float64  `json:"version"`
+    Reddituser string `json:"reddituser"`
+    Redditpass string `json:"redditpass"`
 	Host     host     `json:"host"`
 	Database database `json:"database"`
 }
@@ -57,11 +62,10 @@ func main() {
 
 	dbconfig := config.Database
 	dsn := fmt.Sprintf("%s:%s@tcp(%s:3306)/%s", dbconfig.Dbuser, dbconfig.Dbpass, dbconfig.Dbhost, dbconfig.Dbname)
-	conn, _ = sql.Open("mysql", dsn)
+	conn, _ = sqlx.Open("mysql", dsn)
 	if err := conn.Ping(); err != nil {
 		logger.Fatal(err)
 	}
-	var debug bool
 	app_env := os.Getenv("APP_ENVIRONMENT")
 	logger.Println("Running in environment: ", app_env)
 	if app_env == "development" {
@@ -77,22 +81,17 @@ func main() {
 		IsDevelopment: debug,
 	})
 
-	go func() {
-		fetchJob()
-		ticker := time.Tick(1 * time.Hour)
-		for range ticker {
-			fetchJob()
-		}
-	}()
+	go fetchJob(config)
 
-	mux := http.NewServeMux()
-	mux.HandleFunc("/", indexHandler)
-	mux.HandleFunc("/admin/fetch/", fetchHandler)
+	router := httprouter.New()
+	router.GET("/", indexHandler)
+	router.GET("/admin/fetch/", fetchHandler)
+	router.GET("/admin/fetch/detail/:id", fetchDetailHandler)
 
 	listen := fmt.Sprintf("%s:%s", config.Host.ListenAddr, config.Host.ListenPort)
 	logger.Println("Starting server on: ", listen)
 	n := negroni.Classic()
-	n.UseHandler(mux)
+	n.UseHandler(router)
 	n.Run(listen)
 	if err := http.ListenAndServe(listen, nil); err != nil {
 		logger.Fatal("Problem starting server", err)
@@ -100,7 +99,8 @@ func main() {
 	}
 
 }
-func indexHandler(w http.ResponseWriter, req *http.Request) {
+
+func indexHandler(w http.ResponseWriter, req *http.Request, _ httprouter.Params) {
 	p := struct {
 		Title string
 		Body  string
@@ -111,113 +111,102 @@ func indexHandler(w http.ResponseWriter, req *http.Request) {
 	r.HTML(w, http.StatusOK, "index", p)
 }
 
-func fetchHandler(w http.ResponseWriter, req *http.Request) {
-	var (
-		title     string
-		reddit_id string
-		url       string
-	)
-	type Submission struct {
-		Title    string
-		RedditID string
-		URL      string
-	}
 
-	var submissions []*Submission
-	rs, err := conn.Query("select title, reddit_id, url from submissions")
-	if err != nil {
-		logger.Println("fetching rows failed")
-	}
-	defer rs.Close()
-	for rs.Next() {
-		err := rs.Scan(&title, &reddit_id, &url)
-		if err != nil {
-			logger.Println(err)
-		}
-		s := Submission{
-			title,
-			reddit_id,
-			url,
-		}
-		submissions = append(submissions, &s)
-	}
-	err = rs.Err()
+func fetchHandler(w http.ResponseWriter, req *http.Request, _ httprouter.Params) {
+
+    type Submission struct {
+        Title string
+        Permalink string
+        RedditID string  `db:"reddit_id"`
+        URL string
+    }
+    submissions := []Submission{}
+	err := conn.Select(&submissions, "select title, permalink, reddit_id, url from submissions")
 	if err != nil {
 		logger.Println(err)
 	}
-	p := struct {
-		Title       string
-		Submissions []*Submission
-	}{
-		"fetch page",
-		submissions,
-	}
+    p := struct {
+        Title string
+        Submissions []Submission
+    }{
+        "Fetch page",
+        submissions,
+    }
+
 	r.HTML(w, http.StatusOK, "admin/fetch", p)
 }
-
-func fetchJob() {
-	logger.Println("starting fetch job")
-
-	fetch_sql, err := conn.Prepare("insert into submissions (url, reddit_id, title) values ( ?, ?, ?)")
+func fetchDetailHandler(w http.ResponseWriter, req *http.Request, params httprouter.Params) {
+    type Submission struct {
+        Title string
+        Permalink string
+        RedditID string  `db:"reddit_id"`
+        URL string
+        Selftext string
+    }
+	submission := Submission{}
+    err := conn.Get(&submission, "select title, permalink, reddit_id, url, selftext from submissions where reddit_id = ?", params.ByName("id"))
 	if err != nil {
 		logger.Println(err)
 	}
+    p := struct {
+        Title string
+        Sub Submission
+    }{
+    "detail page",
+    submission,
+    }
+	r.HTML(w, http.StatusOK, "admin/fetch/detail", p)
+}
+func fetchJob(config Config) {
+	ticker := time.Tick(1 * time.Minute)
+	for range ticker {
+		logger.Println("starting fetch job")
 
-	rs, err := conn.Query("select reddit_id from submissions")
-	if err != nil {
-		logger.Println(err)
-	}
-	defer rs.Close()
-	var haves []string
-	for rs.Next() {
-		var have string
-		err := rs.Scan(&have)
+		var haves []string
+		err := conn.Select(&haves, "select reddit_id from submissions")
 		if err != nil {
 			logger.Println(err)
 		}
-		haves = append(haves, have)
-	}
-	err = rs.Err()
-	if err != nil {
-		logger.Fatal(err)
-	}
-	subreddit := "golang"
-	// todo: add toggle meppitdev
-	ua := fmt.Sprintf("web:Meppit: /r/meppit -  maps for reddit -:v %s (by /u/anoland)", config.Version)
-	ggg := geddit.NewSession(ua)
-	submissions, _ := ggg.SubredditSubmissions(subreddit)
-	count := 0
-	for _, sub := range submissions {
-		_, ok := idExists(haves, sub.ID)
-		if !ok {
-			_, err := fetch_sql.Exec(sub.URL, sub.ID, sub.Title)
-			count = count + 1
-			if err != nil {
-				logger.Println(err)
+		fetch_sql, err := conn.Prepare("insert into submissions (url, reddit_id, permalink, title, submitted_by ,selftext, date_created) values ( ?, ?, ?, ?, ?, ?, ?)")
+		if err != nil {
+			logger.Println(err)
+		}
+
+		ua := fmt.Sprintf("web:Meppit: /r/meppit -maps for reddit-:v %02f (by /u/anoland)", config.Version)
+
+		ggg, err := geddit.NewLoginSession(config.Reddituser, config.Redditpass, ua)
+        logger.Printf("%#v", ggg)
+        if err != nil {
+            logger.Printf("login session error: ", err)
+        }
+        subreddit := "meppit"
+        if debug {
+            subreddit = "meppitdev"
+        }
+		submissions, err := ggg.SubredditSubmissions(subreddit)
+        if err != nil {
+            logger.Println(err)
+        }
+		count := 0
+		for _, sub := range submissions {
+			_, ok := idExists(haves, sub.ID)
+			if !ok {
+				_, err := fetch_sql.Exec(sub.URL, sub.ID, sub.Permalink, sub.Title, sub.Author, sub.Selftext, sub.DateCreated)
+				count = count + 1
+				if err != nil {
+					logger.Println(err)
+				}
 			}
+
 		}
+		// todo: keep track of last sucessful fetch time
 
+		logger.Println("finished fetch job.")
+		logger.Printf("processed %d submissions", count)
 	}
-	// todo: keep track of last sucessful fetch
-
-	logger.Println("finished fetch job.")
-	logger.Printf("processed %d submissions", count)
 }
 
-func idExists2(haystack []string, needle string) (int, bool) {
-	sort.Strings(haystack)
-	l := len(haystack)
-	for i := 0; i < l; i++ {
-		value := haystack[i]
-		if value < needle {
-			continue
-		}
-		return i, value == needle
-	}
-	return l, false
-}
 
-// reconfiguration of above using binary (builtin) search instead
 func idExists(haystack []string, needle string) (int, bool) {
 	sort.Strings(haystack)
 	l := len(haystack)

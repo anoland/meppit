@@ -1,15 +1,15 @@
 {
     "version":0.1,
-    "reddituser":"meppit",
-    "redditpass":"Changeme22",
+    "reddituser":"username",
+    "redditpass":"password",
     "host":{
-        "listenaddr":"50.116.22.42",
+        "listenaddr":"0.0.0.0",
         "listenport":"8080"
     },
     "database":{
-        "dbhost":"wwwdbhost",
-        "dbuser":"meppit",
-        "dbpass":"c7e61d4eee",
-        "dbname":"meppit"
+        "dbhost":"dbhost",
+        "dbuser":"dbuser",
+        "dbpass":"pass",
+        "dbname":"dbname"
     }
 }
